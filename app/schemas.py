@@ -1,26 +1,38 @@
-from functools import lru_cache
-
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import BaseModel, Field
 
 
-class Settings(BaseSettings):
-    redis_url: str = "redis://localhost:6379/0"
+MAX_CLIENT_LIMIT = 100_000
 
-    rate_limit_limit: int = 100
-    rate_limit_window_seconds: int = 60
-
-    redis_timeout_seconds: float = 0.25
-    redis_max_connections: int = 128
-
-    # If True, requests are allowed when Redis is unavailable.
-    # If False, requests are denied / middleware returns 503.
-    rate_limit_fail_open: bool = True
-
-    protected_path_prefixes: tuple[str, ...] = ("/demo", "/private")
-
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+CLIENT_ID_PATTERN = r"^[^{}\r\n]+$"
 
 
-@lru_cache
-def get_settings() -> Settings:
-    return Settings()
+class CheckRequest(BaseModel):
+    client_id: str = Field(
+        min_length=1,
+        max_length=128,
+        pattern=CLIENT_ID_PATTERN,
+    )
+
+
+class CheckResponse(BaseModel):
+    allowed: bool
+    remaining: int
+    reset_at: int
+
+
+class SetClientLimitRequest(BaseModel):
+    limit: int = Field(
+        ge=0,
+        le=MAX_CLIENT_LIMIT,
+        description="0 fully blocks the client",
+    )
+
+
+class SetClientLimitResponse(BaseModel):
+    client_id: str
+    limit: int
+
+
+class ClientLimitResponse(BaseModel):
+    client_id: str
+    limit: int | None
