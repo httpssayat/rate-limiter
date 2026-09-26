@@ -1,2 +1,120 @@
+x-app-env: &app_env
+  REDIS_URL: redis://redis:6379/0
+  RATE_LIMIT_LIMIT: "100"
+  RATE_LIMIT_WINDOW_SECONDS: "60"
+  RATE_LIMIT_FAIL_OPEN: "true"
+  REDIS_TIMEOUT_SECONDS: "0.25"
+  REDIS_MAX_CONNECTIONS: "128"
+
 services:
-  
+  redis:
+    image: redis:7-alpine
+    command:
+      - redis-server
+      - --appendonly
+      - "no"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      timeout: 2s
+      retries: 30
+    ports:
+      - "6379:6379"
+
+  # PostgreSQL is not used by the rate limiter itself because counter state
+  # must live only in Redis. This service exists only for the common stack
+  # requirement and can be started with: docker compose --profile postgres up.
+  postgres:
+    image: postgres:16-alpine
+    profiles:
+      - postgres
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+
+  app1:
+    build: .
+    environment: *app_env
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "8001:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0', timeout=1)\""]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+
+  app2:
+    build: .
+    environment: *app_env
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "8002:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0', timeout=1)\""]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+
+  nginx:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      app1:
+        condition: service_healthy
+      app2:
+        condition: service_healthy
+    ports:
+      - "8000:80"
+
+  app-short-window:
+    profiles:
+      - test
+    build: .
+    environment:
+      <<: *app_env
+      RATE_LIMIT_LIMIT: "5"
+      RATE_LIMIT_WINDOW_SECONDS: "2"
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "8003:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0', timeout=1)\""]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+
+  tests:
+    profiles:
+      - test
+    build: .
+    environment:
+      LB_URL: http://nginx:80
+      APP1_URL: http://app1:8000
+      APP2_URL: http://app2:8000
+      APP_SHORT_URL: http://app-short-window:8000
+      REDIS_URL: redis://redis:6379/0
+      RATE_LIMIT_WINDOW_SECONDS: "60"
+    depends_on:
+      app1:
+        condition: service_healthy
+      app2:
+        condition: service_healthy
+      nginx:
+        condition: service_started
+      app-short-window:
+        condition: service_healthy
+    command: pytest -q
