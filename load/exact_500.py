@@ -30,7 +30,7 @@ async def warmup(client: httpx.AsyncClient) -> None:
 
 
 async def main() -> None:
-    limits = httpx.Limits(max_connections=TOTAL, max_keepalive_connections=TOTAL)
+    limits = httpx.Limits(max_connections=1000, max_keepalive_connections=1000)
 
     async with httpx.AsyncClient(timeout=30, limits=limits) as client:
         await warmup(client)

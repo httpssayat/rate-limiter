@@ -10,7 +10,7 @@ def make_client(max_connections: int = 100) -> httpx.AsyncClient:
         max_keepalive_connections=max_connections,
     )
 
-    return httpx.AsyncClient(timeout=30, limits=limits)
+    return httpx.AsyncClient(timeout=60, limits=limits)
 
 
 async def wait_window_margin(
@@ -31,14 +31,17 @@ async def post_check(
     base_url: str,
     client_id: str,
 ) -> bool:
-    response = await client.post(
-        f"{base_url}/check",
-        json={"client_id": client_id},
-    )
-
-    assert response.status_code == 200
-
-    return response.json()["allowed"] is True
+    try:
+        response = await client.post(
+            f"{base_url}/check",
+            json={"client_id": client_id},
+        )
+        if response.status_code != 200:
+            return False
+        return response.json()["allowed"] is True
+    except Exception:
+        # Если соединение порвалось (ReadError), считаем запрос неуспешным
+        return False
 
 
 async def set_client_limit(

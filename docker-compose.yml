@@ -3,8 +3,8 @@ x-app-env: &app_env
   RATE_LIMIT_LIMIT: "100"
   RATE_LIMIT_WINDOW_SECONDS: "60"
   RATE_LIMIT_FAIL_OPEN: "true"
-  REDIS_TIMEOUT_SECONDS: "0.25"
-  REDIS_MAX_CONNECTIONS: "128"
+  REDIS_TIMEOUT_SECONDS: "2.0"
+  REDIS_MAX_CONNECTIONS: "1000"
 
 services:
   redis:
@@ -41,13 +41,17 @@ services:
   app1:
     build: .
     environment: *app_env
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     depends_on:
       redis:
         condition: service_healthy
     ports:
       - "8001:8000"
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0', timeout=1)\""]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=1)"]
       interval: 1s
       timeout: 3s
       retries: 30
@@ -55,13 +59,17 @@ services:
   app2:
     build: .
     environment: *app_env
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     depends_on:
       redis:
         condition: service_healthy
     ports:
       - "8002:8000"
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0', timeout=1)\""]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=1)"]
       interval: 1s
       timeout: 3s
       retries: 30
@@ -92,7 +100,7 @@ services:
     ports:
       - "8003:8000"
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0', timeout=1)\""]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=1)"]
       interval: 1s
       timeout: 3s
       retries: 30
@@ -101,6 +109,10 @@ services:
     profiles:
       - test
     build: .
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     environment:
       LB_URL: http://nginx:80
       APP1_URL: http://app1:8000
