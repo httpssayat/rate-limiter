@@ -1,20 +1,3 @@
--- Atomic fixed-window rate limit check with optional per-client limit.
---
--- KEYS[1] = counter prefix, example: rl:{user_123}
--- KEYS[2] = per-client limit key, example: rl:limit:{user_123}
---
--- ARGV[1] = default limit
--- ARGV[2] = window size in seconds
---
--- Returns:
--- {
---   allowed,          -- 1 = allowed, 0 = denied
---   remaining,        -- remaining requests in current window
---   reset_at,         -- unix time when current window ends
---   current,          -- current counter value
---   effective_limit   -- limit actually used for this client
--- }
-
 redis.replicate_commands()
 
 local default_limit = tonumber(ARGV[1])
