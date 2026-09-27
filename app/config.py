@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    """Настройки приложения, читаются из переменных окружения."""
     redis_url: str = "redis://localhost:6379/0"
 
     rate_limit_limit: int = 100
