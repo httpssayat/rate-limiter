@@ -21,9 +21,6 @@ services:
     ports:
       - "6379:6379"
 
-  # PostgreSQL is not used by the rate limiter itself because counter state
-  # must live only in Redis. This service exists only for the common stack
-  # requirement and can be started with: docker compose --profile postgres up.
   postgres:
     image: postgres:16-alpine
     profiles:
